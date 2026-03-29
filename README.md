@@ -23,11 +23,3 @@ A sleek, dark-themed interactive tool for electronics engineers and hobbyists to
 
 ---
 
-- [x] Live app URL: `___________________`
-- [x] Source code in `Tutorials/Submissions/<Name>/Week-08/`
-- [x] README with deployment steps (this file)
-- [ ] Optional: demo GIF or video
-
----
-
-*Built with no frameworks, no build tools, no npm install. Just open `index.html` locally and it works.*
