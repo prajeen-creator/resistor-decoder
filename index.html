@@ -1,0 +1,970 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Resistor Decoder — Color Code Calculator</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow+Condensed:wght@300;400;600;700;900&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #0d0d0f;
+      --surface: #16161a;
+      --surface2: #1e1e24;
+      --border: #2a2a35;
+      --text: #e8e8f0;
+      --muted: #6b6b80;
+      --accent: #f5a623;
+      --accent2: #e84040;
+      --green: #39d98a;
+      --mono: 'Share Tech Mono', monospace;
+      --sans: 'Barlow Condensed', sans-serif;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--sans);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* Scan line overlay */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(0,0,0,0.08) 2px,
+        rgba(0,0,0,0.08) 4px
+      );
+      pointer-events: none;
+      z-index: 100;
+    }
+
+    /* Grid noise background */
+    body::after {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(245,166,35,0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(245,166,35,0.03) 1px, transparent 1px);
+      background-size: 40px 40px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .container {
+      position: relative;
+      z-index: 1;
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 40px 24px 80px;
+    }
+
+    /* Header */
+    header {
+      margin-bottom: 48px;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 24px;
+    }
+
+    .header-top {
+      display: flex;
+      align-items: baseline;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .logo-tag {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--accent);
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      border: 1px solid var(--accent);
+      padding: 3px 8px;
+      opacity: 0.8;
+    }
+
+    h1 {
+      font-family: var(--sans);
+      font-size: clamp(2.2rem, 6vw, 4rem);
+      font-weight: 900;
+      letter-spacing: -0.02em;
+      line-height: 1;
+      text-transform: uppercase;
+    }
+
+    h1 span {
+      color: var(--accent);
+    }
+
+    .subtitle {
+      font-family: var(--mono);
+      font-size: 12px;
+      color: var(--muted);
+      letter-spacing: 0.15em;
+      margin-top: 10px;
+    }
+
+    /* Mode tabs */
+    .mode-tabs {
+      display: flex;
+      gap: 2px;
+      margin-bottom: 36px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: 4px;
+      width: fit-content;
+    }
+
+    .tab-btn {
+      font-family: var(--sans);
+      font-weight: 700;
+      font-size: 13px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      background: none;
+      border: none;
+      color: var(--muted);
+      padding: 10px 22px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .tab-btn.active {
+      background: var(--accent);
+      color: #000;
+    }
+
+    .tab-btn:not(.active):hover {
+      color: var(--text);
+      background: var(--border);
+    }
+
+    /* Panels */
+    .panel { display: none; }
+    .panel.active { display: block; }
+
+    /* ── DECODE PANEL ── */
+    .resistor-visual {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: 32px 24px;
+      margin-bottom: 32px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 28px;
+    }
+
+    .resistor-body-wrap {
+      display: flex;
+      align-items: center;
+      gap: 0;
+      width: 100%;
+      max-width: 560px;
+      justify-content: center;
+    }
+
+    .lead {
+      width: 60px;
+      height: 3px;
+      background: #aaa;
+      flex-shrink: 0;
+    }
+
+    .resistor-body {
+      background: #d4a96a;
+      border-radius: 12px;
+      width: 340px;
+      height: 52px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0;
+      position: relative;
+      flex-shrink: 0;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.15);
+      overflow: hidden;
+    }
+
+    .band-slot {
+      height: 100%;
+      transition: background-color 0.25s ease;
+      position: relative;
+    }
+
+    /* Band widths - 4 bands */
+    .bands-4 .band-slot:nth-child(1),
+    .bands-4 .band-slot:nth-child(2),
+    .bands-4 .band-slot:nth-child(3) { width: 28px; }
+    .bands-4 .band-slot:nth-child(4) { width: 28px; margin-left: 32px; }
+
+    /* Band widths - 5 bands */
+    .bands-5 .band-slot:nth-child(1),
+    .bands-5 .band-slot:nth-child(2),
+    .bands-5 .band-slot:nth-child(3),
+    .bands-5 .band-slot:nth-child(4) { width: 24px; }
+    .bands-5 .band-slot:nth-child(5) { width: 24px; margin-left: 24px; }
+
+    .band-spacer {
+      height: 100%;
+      background: #d4a96a;
+    }
+
+    .bands-4 .band-spacer { width: 18px; }
+    .bands-5 .band-spacer { width: 14px; }
+
+    /* Band selectors */
+    .bands-grid {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .band-selector {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .band-label {
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--muted);
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+    }
+
+    .color-select {
+      appearance: none;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-family: var(--mono);
+      font-size: 12px;
+      padding: 8px 28px 8px 10px;
+      cursor: pointer;
+      width: 120px;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' fill='none'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%236b6b80' stroke-width='1.5'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 10px center;
+      transition: border-color 0.15s;
+    }
+
+    .color-select:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+
+    .color-swatch {
+      width: 120px;
+      height: 6px;
+      border-radius: 1px;
+      transition: background 0.25s;
+    }
+
+    /* Result box */
+    .result-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: 28px 32px;
+      margin-bottom: 24px;
+    }
+
+    .result-main {
+      display: flex;
+      align-items: baseline;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 16px;
+    }
+
+    .result-label {
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: 0.2em;
+      color: var(--muted);
+      text-transform: uppercase;
+    }
+
+    .result-value {
+      font-family: var(--sans);
+      font-size: clamp(2rem, 5vw, 3.2rem);
+      font-weight: 900;
+      color: var(--accent);
+      letter-spacing: -0.02em;
+      line-height: 1;
+    }
+
+    .result-tolerance {
+      font-family: var(--mono);
+      font-size: 14px;
+      color: var(--green);
+    }
+
+    .result-range {
+      font-family: var(--mono);
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 8px;
+    }
+
+    .result-range span { color: var(--text); }
+
+    /* Band count toggle */
+    .band-count-toggle {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+
+    .band-count-label {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--muted);
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+    }
+
+    .toggle-group {
+      display: flex;
+      gap: 2px;
+    }
+
+    .toggle-btn {
+      font-family: var(--mono);
+      font-size: 12px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--muted);
+      padding: 6px 16px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .toggle-btn.active {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #000;
+      font-weight: bold;
+    }
+
+    /* ── ENCODE PANEL ── */
+    .encode-input-group {
+      display: flex;
+      gap: 12px;
+      align-items: flex-end;
+      flex-wrap: wrap;
+      margin-bottom: 32px;
+    }
+
+    .input-field-wrap {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .input-field-wrap label {
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: 0.15em;
+      color: var(--muted);
+      text-transform: uppercase;
+    }
+
+    .ohm-input {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-family: var(--mono);
+      font-size: 18px;
+      padding: 12px 16px;
+      width: 200px;
+      transition: border-color 0.15s;
+    }
+
+    .ohm-input:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+
+    .unit-select {
+      appearance: none;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-family: var(--mono);
+      font-size: 14px;
+      padding: 12px 32px 12px 14px;
+      cursor: pointer;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' fill='none'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%236b6b80' stroke-width='1.5'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 10px center;
+    }
+
+    .unit-select:focus { outline: none; border-color: var(--accent); }
+
+    .encode-btn {
+      font-family: var(--sans);
+      font-weight: 700;
+      font-size: 13px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      background: var(--accent);
+      color: #000;
+      border: none;
+      padding: 13px 28px;
+      cursor: pointer;
+      transition: opacity 0.15s;
+    }
+
+    .encode-btn:hover { opacity: 0.85; }
+
+    .encode-result {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: 28px;
+    }
+
+    .encode-result-title {
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: 0.2em;
+      color: var(--muted);
+      text-transform: uppercase;
+      margin-bottom: 20px;
+    }
+
+    .encode-bands-display {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+      margin-bottom: 20px;
+    }
+
+    .encode-band-chip {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .encode-band-color {
+      width: 48px;
+      height: 48px;
+      border-radius: 4px;
+      border: 1px solid rgba(255,255,255,0.1);
+    }
+
+    .encode-band-name {
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+    }
+
+    .encode-band-role {
+      font-family: var(--mono);
+      font-size: 9px;
+      color: var(--border);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+    }
+
+    .encode-resistor-visual {
+      margin-top: 20px;
+    }
+
+    /* Reference table */
+    .ref-section {
+      margin-top: 48px;
+    }
+
+    .ref-title {
+      font-family: var(--sans);
+      font-size: 16px;
+      font-weight: 700;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 16px;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 10px;
+    }
+
+    .ref-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-family: var(--mono);
+      font-size: 12px;
+    }
+
+    .ref-table th {
+      text-align: left;
+      padding: 8px 12px;
+      background: var(--surface);
+      color: var(--muted);
+      letter-spacing: 0.12em;
+      font-size: 10px;
+      text-transform: uppercase;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .ref-table td {
+      padding: 9px 12px;
+      border-bottom: 1px solid var(--border);
+      color: var(--text);
+    }
+
+    .ref-table tr:hover td { background: var(--surface2); }
+
+    .color-dot {
+      display: inline-block;
+      width: 14px;
+      height: 14px;
+      border-radius: 2px;
+      vertical-align: middle;
+      margin-right: 8px;
+      border: 1px solid rgba(255,255,255,0.12);
+    }
+
+    /* Separator */
+    .sep {
+      color: var(--border);
+      margin: 0 4px;
+    }
+
+    /* Flicker animation */
+    @keyframes flicker {
+      0%, 100% { opacity: 1; }
+      92% { opacity: 1; }
+      93% { opacity: 0.85; }
+      94% { opacity: 1; }
+      96% { opacity: 0.9; }
+      97% { opacity: 1; }
+    }
+
+    .result-value { animation: flicker 8s infinite; }
+
+    /* Responsive */
+    @media (max-width: 600px) {
+      .resistor-body { width: 260px; }
+      .lead { width: 30px; }
+      .bands-grid { gap: 8px; }
+      .color-select, .color-swatch { width: 100px; }
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <header>
+    <div class="header-top">
+      <span class="logo-tag">EE TOOLKIT v1.0</span>
+    </div>
+    <h1>Resistor <span>Decoder</span></h1>
+    <p class="subtitle">// COLOR CODE CALCULATOR &nbsp;·&nbsp; 4-BAND &amp; 5-BAND &nbsp;·&nbsp; ENCODE &amp; DECODE</p>
+  </header>
+
+  <div class="mode-tabs">
+    <button class="tab-btn active" onclick="switchTab('decode')">Decode → Value</button>
+    <button class="tab-btn" onclick="switchTab('encode')">Encode → Colors</button>
+    <button class="tab-btn" onclick="switchTab('ref')">Color Reference</button>
+  </div>
+
+  <!-- DECODE PANEL -->
+  <div class="panel active" id="panel-decode">
+
+    <div class="band-count-toggle">
+      <span class="band-count-label">Bands:</span>
+      <div class="toggle-group">
+        <button class="toggle-btn active" onclick="setBandCount(4, this)">4-Band</button>
+        <button class="toggle-btn" onclick="setBandCount(5, this)">5-Band</button>
+      </div>
+    </div>
+
+    <div class="resistor-visual">
+      <div class="resistor-body-wrap">
+        <div class="lead"></div>
+        <div class="resistor-body" id="resistor-body">
+          <!-- Bands injected by JS -->
+        </div>
+        <div class="lead"></div>
+      </div>
+
+      <div class="bands-grid" id="bands-grid">
+        <!-- Selectors injected by JS -->
+      </div>
+    </div>
+
+    <div class="result-box">
+      <div class="result-label">Resistance</div>
+      <div class="result-main">
+        <div class="result-value" id="result-value">—</div>
+        <div class="result-tolerance" id="result-tolerance"></div>
+      </div>
+      <div class="result-range" id="result-range"></div>
+    </div>
+
+  </div>
+
+  <!-- ENCODE PANEL -->
+  <div class="panel" id="panel-encode">
+    <div class="encode-input-group">
+      <div class="input-field-wrap">
+        <label>Resistance Value</label>
+        <input class="ohm-input" type="number" id="encode-input" placeholder="e.g. 4.7" min="0" step="any" />
+      </div>
+      <div class="input-field-wrap">
+        <label>Unit</label>
+        <select class="unit-select" id="encode-unit">
+          <option value="1">Ω (Ohm)</option>
+          <option value="1000" selected>kΩ (Kilohm)</option>
+          <option value="1000000">MΩ (Megaohm)</option>
+        </select>
+      </div>
+      <div class="input-field-wrap">
+        <label>Tolerance</label>
+        <select class="unit-select" id="encode-tolerance">
+          <option value="gold">Gold ±5%</option>
+          <option value="silver">Silver ±10%</option>
+          <option value="brown">Brown ±1%</option>
+          <option value="red">Red ±2%</option>
+          <option value="green">Green ±0.5%</option>
+        </select>
+      </div>
+      <button class="encode-btn" onclick="encodeResistor()">Encode</button>
+    </div>
+
+    <div class="encode-result" id="encode-result" style="display:none;">
+      <div class="encode-result-title">// Color Bands</div>
+      <div class="encode-bands-display" id="encode-bands-display"></div>
+      <div class="encode-resistor-visual" id="encode-resistor-visual"></div>
+    </div>
+  </div>
+
+  <!-- REFERENCE PANEL -->
+  <div class="panel" id="panel-ref">
+    <table class="ref-table">
+      <thead>
+        <tr>
+          <th>Color</th>
+          <th>Digit</th>
+          <th>Multiplier</th>
+          <th>Tolerance</th>
+          <th>Temp Coef (ppm/°C)</th>
+        </tr>
+      </thead>
+      <tbody id="ref-table-body"></tbody>
+    </table>
+  </div>
+
+  <div class="ref-section" id="ref-section-bottom" style="display:none;"></div>
+
+</div>
+
+<script>
+// ── Color Data ──
+const COLORS = [
+  { name: 'Black',  hex: '#1a1a1a', digit: 0,  mult: 1,          tol: null,    temp: 250  },
+  { name: 'Brown',  hex: '#7b3f00', digit: 1,  mult: 10,         tol: '±1%',   temp: 100  },
+  { name: 'Red',    hex: '#cc2200', digit: 2,  mult: 100,        tol: '±2%',   temp: 50   },
+  { name: 'Orange', hex: '#e8720c', digit: 3,  mult: 1000,       tol: null,    temp: 15   },
+  { name: 'Yellow', hex: '#f5d800', digit: 4,  mult: 10000,      tol: null,    temp: 25   },
+  { name: 'Green',  hex: '#2d8a3e', digit: 5,  mult: 100000,     tol: '±0.5%', temp: 20   },
+  { name: 'Blue',   hex: '#1a52cc', digit: 6,  mult: 1000000,    tol: '±0.25%',temp: 10  },
+  { name: 'Violet', hex: '#7b1fa2', digit: 7,  mult: 10000000,   tol: '±0.1%', temp: 5   },
+  { name: 'Grey',   hex: '#7a7a7a', digit: 8,  mult: 100000000,  tol: '±0.05%',temp: 1   },
+  { name: 'White',  hex: '#f0f0f0', digit: 9,  mult: 1000000000, tol: null,    temp: null },
+  { name: 'Gold',   hex: '#c9a84c', digit: null, mult: 0.1,      tol: '±5%',   temp: null },
+  { name: 'Silver', hex: '#a8a8a8', digit: null, mult: 0.01,     tol: '±10%',  temp: null },
+];
+
+const DIGIT_COLORS = COLORS.filter(c => c.digit !== null);
+const MULT_COLORS  = COLORS.filter(c => c.mult !== null);
+const TOL_COLORS   = COLORS.filter(c => c.tol  !== null);
+
+let bandCount = 4;
+
+function colorByName(name) {
+  return COLORS.find(c => c.name === name);
+}
+
+// ── Format ohms nicely ──
+function formatOhms(val) {
+  if (val === null || isNaN(val)) return '—';
+  if (val >= 1e9)  return (val/1e9).toPrecision(4).replace(/\.?0+$/, '') + ' GΩ';
+  if (val >= 1e6)  return (val/1e6).toPrecision(4).replace(/\.?0+$/, '') + ' MΩ';
+  if (val >= 1e3)  return (val/1e3).toPrecision(4).replace(/\.?0+$/, '') + ' kΩ';
+  return val.toPrecision(4).replace(/\.?0+$/, '') + ' Ω';
+}
+
+// ── Build resistor body SVG-style using divs ──
+function buildResistorBody(bandColors) {
+  const body = document.getElementById('resistor-body');
+  body.className = `resistor-body bands-${bandCount}`;
+  body.innerHTML = '';
+
+  bandColors.forEach((color, i) => {
+    if (i > 0) {
+      const sp = document.createElement('div');
+      sp.className = 'band-spacer';
+      body.appendChild(sp);
+    }
+    if (i === bandColors.length - 1 && bandCount === 4 && i === 3) {
+      // tolerance band gets slight gap (handled by CSS margin-left)
+    }
+    const band = document.createElement('div');
+    band.className = 'band-slot';
+    band.id = `body-band-${i}`;
+    band.style.background = color || '#d4a96a';
+    body.appendChild(band);
+  });
+}
+
+// ── Build decode selectors ──
+function buildDecodeUI() {
+  const grid = document.getElementById('bands-grid');
+  grid.innerHTML = '';
+
+  const bandDefs4 = [
+    { label: 'Band 1', role: 'Digit 1', colors: DIGIT_COLORS },
+    { label: 'Band 2', role: 'Digit 2', colors: DIGIT_COLORS },
+    { label: 'Band 3', role: 'Multiplier', colors: MULT_COLORS },
+    { label: 'Band 4', role: 'Tolerance', colors: TOL_COLORS },
+  ];
+
+  const bandDefs5 = [
+    { label: 'Band 1', role: 'Digit 1',    colors: DIGIT_COLORS },
+    { label: 'Band 2', role: 'Digit 2',    colors: DIGIT_COLORS },
+    { label: 'Band 3', role: 'Digit 3',    colors: DIGIT_COLORS },
+    { label: 'Band 4', role: 'Multiplier', colors: MULT_COLORS  },
+    { label: 'Band 5', role: 'Tolerance',  colors: TOL_COLORS   },
+  ];
+
+  const defs = bandCount === 4 ? bandDefs4 : bandDefs5;
+
+  // default selections
+  const defaults4 = ['Yellow','Violet','Red','Gold'];
+  const defaults5 = ['Brown','Black','Black','Red','Brown'];
+  const defaults = bandCount === 4 ? defaults4 : defaults5;
+
+  defs.forEach((def, i) => {
+    const wrap = document.createElement('div');
+    wrap.className = 'band-selector';
+
+    const lbl = document.createElement('div');
+    lbl.className = 'band-label';
+    lbl.textContent = def.label;
+
+    const sel = document.createElement('select');
+    sel.className = 'color-select';
+    sel.id = `band-sel-${i}`;
+    def.colors.forEach(c => {
+      const opt = document.createElement('option');
+      opt.value = c.name;
+      opt.textContent = c.name;
+      if (c.name === defaults[i]) opt.selected = true;
+      sel.appendChild(opt);
+    });
+
+    const swatch = document.createElement('div');
+    swatch.className = 'color-swatch';
+    swatch.id = `swatch-${i}`;
+
+    const role = document.createElement('div');
+    role.className = 'band-label';
+    role.style.color = '#3a3a4a';
+    role.textContent = def.role;
+
+    sel.addEventListener('change', () => {
+      updateDecodeVisuals();
+      calculate();
+    });
+
+    wrap.appendChild(lbl);
+    wrap.appendChild(sel);
+    wrap.appendChild(swatch);
+    wrap.appendChild(role);
+    grid.appendChild(wrap);
+  });
+
+  updateDecodeVisuals();
+  calculate();
+}
+
+function updateDecodeVisuals() {
+  const n = bandCount;
+  const colors = [];
+  for (let i = 0; i < n; i++) {
+    const sel = document.getElementById(`band-sel-${i}`);
+    const c = colorByName(sel.value);
+    colors.push(c ? c.hex : '#d4a96a');
+    const swatch = document.getElementById(`swatch-${i}`);
+    if (swatch) swatch.style.background = c ? c.hex : '#888';
+  }
+  buildResistorBody(colors);
+}
+
+function calculate() {
+  let val, tol;
+
+  if (bandCount === 4) {
+    const d1 = colorByName(document.getElementById('band-sel-0').value);
+    const d2 = colorByName(document.getElementById('band-sel-1').value);
+    const mult = colorByName(document.getElementById('band-sel-2').value);
+    const tolC = colorByName(document.getElementById('band-sel-3').value);
+    if (!d1 || !d2 || !mult || !tolC) return;
+    val = (d1.digit * 10 + d2.digit) * mult.mult;
+    tol = tolC.tol;
+  } else {
+    const d1 = colorByName(document.getElementById('band-sel-0').value);
+    const d2 = colorByName(document.getElementById('band-sel-1').value);
+    const d3 = colorByName(document.getElementById('band-sel-2').value);
+    const mult = colorByName(document.getElementById('band-sel-3').value);
+    const tolC = colorByName(document.getElementById('band-sel-4').value);
+    if (!d1 || !d2 || !d3 || !mult || !tolC) return;
+    val = (d1.digit * 100 + d2.digit * 10 + d3.digit) * mult.mult;
+    tol = tolC.tol;
+  }
+
+  document.getElementById('result-value').textContent = formatOhms(val);
+  document.getElementById('result-tolerance').textContent = tol || '';
+
+  if (tol) {
+    const pct = parseFloat(tol.replace('±','').replace('%','')) / 100;
+    const lo = val * (1 - pct);
+    const hi = val * (1 + pct);
+    document.getElementById('result-range').innerHTML =
+      `Range: <span>${formatOhms(lo)}</span> — <span>${formatOhms(hi)}</span>`;
+  } else {
+    document.getElementById('result-range').textContent = '';
+  }
+}
+
+function setBandCount(n, btn) {
+  bandCount = n;
+  document.querySelectorAll('.toggle-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  buildDecodeUI();
+}
+
+// ── ENCODE ──
+function encodeResistor() {
+  const raw = parseFloat(document.getElementById('encode-input').value);
+  const unit = parseFloat(document.getElementById('encode-unit').value);
+  const tolKey = document.getElementById('encode-tolerance').value;
+
+  if (isNaN(raw) || raw <= 0) {
+    alert('Enter a valid positive resistance value.');
+    return;
+  }
+
+  const ohms = raw * unit;
+  const tolColor = colorByName(tolKey.charAt(0).toUpperCase() + tolKey.slice(1));
+
+  // find best 4-band representation
+  let best = null, bestErr = Infinity;
+
+  DIGIT_COLORS.forEach(d1 => {
+    DIGIT_COLORS.forEach(d2 => {
+      MULT_COLORS.forEach(m => {
+        const v = (d1.digit * 10 + d2.digit) * m.mult;
+        const err = Math.abs(v - ohms) / ohms;
+        if (err < bestErr) {
+          bestErr = err;
+          best = { bands: [d1, d2, m, tolColor], value: v, bands4: true };
+        }
+      });
+    });
+  });
+
+  const display = document.getElementById('encode-bands-display');
+  const roles = ['Digit 1', 'Digit 2', 'Multiplier', 'Tolerance'];
+  display.innerHTML = '';
+
+  best.bands.forEach((c, i) => {
+    const chip = document.createElement('div');
+    chip.className = 'encode-band-chip';
+    chip.innerHTML = `
+      <div class="encode-band-color" style="background:${c.hex};"></div>
+      <div class="encode-band-name">${c.name}</div>
+      <div class="encode-band-role">${roles[i]}</div>
+    `;
+    display.appendChild(chip);
+  });
+
+  // mini resistor
+  const viz = document.getElementById('encode-resistor-visual');
+  viz.innerHTML = `
+    <div style="display:flex;align-items:center;gap:0;margin-top:8px;">
+      <div style="width:40px;height:3px;background:#aaa;"></div>
+      <div class="resistor-body bands-4" style="width:220px;height:36px;">
+        ${best.bands.map((c,i) => {
+          const spacer = i>0 ? '<div class="band-spacer" style="background:#d4a96a;width:14px;height:100%;"></div>' : '';
+          const ml = i===3 ? 'margin-left:20px;' : '';
+          return `${spacer}<div class="band-slot" style="width:20px;background:${c.hex};${ml}"></div>`;
+        }).join('')}
+      </div>
+      <div style="width:40px;height:3px;background:#aaa;"></div>
+    </div>
+    <div style="font-family:var(--mono);font-size:12px;color:var(--muted);margin-top:12px;">
+      Encoded as: <span style="color:var(--accent);">${formatOhms(best.value)}</span>
+      ${bestErr > 0.001 ? `<span style="color:#e84040;margin-left:8px;">(nearest: ${(bestErr*100).toFixed(2)}% error)</span>` : ''}
+    </div>
+  `;
+
+  document.getElementById('encode-result').style.display = 'block';
+}
+
+// ── REFERENCE TABLE ──
+function buildRefTable() {
+  const tbody = document.getElementById('ref-table-body');
+  COLORS.forEach(c => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><span class="color-dot" style="background:${c.hex};"></span>${c.name}</td>
+      <td style="color:var(--accent)">${c.digit !== null ? c.digit : '—'}</td>
+      <td style="color:var(--green)">${c.mult !== null ? formatMult(c.mult) : '—'}</td>
+      <td style="color:#a78bfa">${c.tol || '—'}</td>
+      <td style="color:var(--muted)">${c.temp !== null ? c.temp : '—'}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+function formatMult(m) {
+  if (m >= 1e9) return '×' + (m/1e9) + 'G';
+  if (m >= 1e6) return '×' + (m/1e6) + 'M';
+  if (m >= 1e3) return '×' + (m/1e3) + 'k';
+  if (m < 1) return '×' + m;
+  return '×' + m;
+}
+
+// ── Tab switching ──
+function switchTab(id) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById(`panel-${id}`).classList.add('active');
+  event.target.classList.add('active');
+}
+
+// ── Init ──
+buildDecodeUI();
+buildRefTable();
+</script>
+</body>
+</html>
